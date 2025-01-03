@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, Calendar, Lock, AlertTriangle } from 'lucide-react';
+import { MessageSquare, Send, Calendar, Lock, AlertTriangle, Plus } from 'lucide-react';
 
 // Therapeutic system prompt
 const therapeuticPrompt = `You are an experienced, empathetic therapist. Your role is to:
@@ -21,6 +21,9 @@ const ChatInterface = () => {
   });
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState(() => {
+    return Date.now().toString();
+  });
   const messagesEndRef = useRef(null);
   const messageRefs = useRef({});
 
@@ -39,6 +42,18 @@ const ChatInterface = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const getMoodEmoji = (mood) => {
+    const moodEmojis = {
+      distressed: '😰',
+      anxious: '😟',
+      depressed: '😢',
+      angry: '😠',
+      happy: '😊',
+      neutral: '😐'
+    };
+    return moodEmojis[mood] || '😐';
+  };
 
   const detectMood = (text) => {
     const moodPatterns = {
@@ -80,10 +95,17 @@ const ChatInterface = () => {
     return null;
   };
 
+  const startNewChat = () => {
+    setActiveConversationId(Date.now().toString());
+    setInput('');
+    scrollToBottom();
+  };
+
   const clearHistory = () => {
     if (window.confirm('Are you sure you want to clear all chat history?')) {
       setMessages([]);
       localStorage.removeItem('chatHistory');
+      startNewChat();
     }
   };
 
@@ -94,7 +116,8 @@ const ChatInterface = () => {
       type: 'user',
       content: input,
       timestamp: new Date().toISOString(),
-      mood: detectMood(input)
+      mood: detectMood(input),
+      conversationId: activeConversationId
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -109,7 +132,8 @@ const ChatInterface = () => {
           type: 'assistant',
           content: crisisResponse,
           timestamp: new Date().toISOString(),
-          isCrisis: true
+          isCrisis: true,
+          conversationId: activeConversationId
         };
         setMessages(prev => [...prev, aiMessage]);
         setIsLoading(false);
@@ -136,124 +160,96 @@ const ChatInterface = () => {
       }
 
       const data = await response.json();
+      
       const aiMessage = {
         type: 'assistant',
         content: data.content,
         timestamp: new Date().toISOString(),
-        mood: userMessage.mood
+        mood: userMessage.mood,
+        conversationId: activeConversationId
       };
       
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('Error:', error);
+      const errorMessage = {
+        type: 'assistant',
+        content: 'I apologize, but I encountered an error. Please try again.',
+        timestamp: new Date().toISOString(),
+        isError: true,
+        conversationId: activeConversationId
+      };
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
   };
 
   const groupConversations = (messages) => {
-    let conversations = [];
-    let currentConvo = [];
-    let lastTimestamp = null;
-
-    messages.forEach(message => {
-      const messageTime = new Date(message.timestamp);
-      if (lastTimestamp && (messageTime - new Date(lastTimestamp)) > 30 * 60 * 1000) {
-        conversations.push({
-          title: currentConvo[0].content.slice(0, 50) + '...',
-          messages: currentConvo,
-          timestamp: currentConvo[0].timestamp,
-          mood: currentConvo[0].mood
-        });
-        currentConvo = [];
+    const conversationMap = messages.reduce((acc, message) => {
+      const id = message.conversationId;
+      if (!acc[id]) {
+        acc[id] = [];
       }
-      currentConvo.push(message);
-      lastTimestamp = message.timestamp;
-    });
+      acc[id].push(message);
+      return acc;
+    }, {});
 
-    if (currentConvo.length > 0) {
-      conversations.push({
-        title: currentConvo[0].content.slice(0, 50) + '...',
-        messages: currentConvo,
-        timestamp: currentConvo[0].timestamp,
-        mood: currentConvo[0].mood
-      });
-    }
+    const conversations = Object.entries(conversationMap).map(([id, messages]) => ({
+      id: id,
+      title: messages[0].content.slice(0, 50) + '...',
+      messages: messages,
+      timestamp: messages[0].timestamp,
+      mood: messages[0].mood
+    }));
 
-    return conversations.reverse();
-  };
-
-  const getMoodEmoji = (mood) => {
-    const moodEmojis = {
-      distressed: '😰',
-      anxious: '😟',
-      depressed: '😢',
-      angry: '😠',
-      happy: '😊',
-      neutral: '😐'
-    };
-    return moodEmojis[mood] || '😐';
+    return conversations.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   };
 
   return (
     <div className="flex h-screen bg-gray-50 p-4">
       {/* Main Chat Area */}
       <div className="w-2/3 mr-4 bg-white rounded-lg shadow-lg overflow-hidden">
-        <div className="border-b border-gray-200 p-4">
-          <div className="flex items-center gap-2 text-gray-800">
-            <MessageSquare className="h-5 w-5 text-blue-600" />
-            <span className="font-semibold">Confide.ai</span>
-            <span className="ml-auto flex items-center text-sm text-gray-500">
-              <Lock className="h-4 w-4 mr-1" />
-              End-to-end encrypted
-            </span>
-          </div>
-        </div>
-        
         <div className="p-4 flex flex-col h-[calc(100vh-8rem)]">
           <div className="flex-grow mb-4 overflow-auto">
             <div className="space-y-4">
-              {groupConversations(messages).map((conversation, index) => (
-                <div key={index}>
-                  {conversation.messages.map((message, msgIndex) => (
-                    <div
-                      key={msgIndex}
-                      ref={el => messageRefs.current[message.timestamp] = el}
-                      className={`p-4 rounded-lg mb-2 ${
-                        message.type === 'user'
-                          ? 'bg-blue-50 ml-12 border border-blue-100'
-                          : 'bg-white mr-12 border border-gray-200'
-                      } ${message.isCrisis ? 'border-red-300 bg-red-50' : ''}`}
-                    >
-                      {message.isCrisis && (
-                        <div className="flex items-center gap-2 text-red-500 mb-2">
-                          <AlertTriangle className="h-4 w-4" />
-                          <span className="text-sm font-medium">Crisis Response</span>
-                        </div>
-                      )}
-                      {message.mood && message.type === 'user' && (
-                        <div className="text-xs text-gray-500 mb-1">
-                          {getMoodEmoji(message.mood)} Detected mood: {message.mood}
-                        </div>
-                      )}
-                      <p className="text-gray-800 whitespace-pre-line leading-relaxed">
-  {message.type === 'assistant' 
-    ? message.content.split('-').map((point, i) => 
-        point.trim() ? (
-          <span key={i} className="block">
-            {i > 0 ? '• ' : ''}{point.trim()}
-            {i < message.content.split('-').length - 1 && point.trim() ? '\n\n' : ''}
-          </span>
-        ) : null
-      )
-    : message.content
-  }
-</p>
-<p className="text-xs text-gray-500 mt-1">
-  {new Date(message.timestamp).toLocaleTimeString()}
-</p>
+              {messages.filter(msg => msg.conversationId === activeConversationId).map((message, index) => (
+                <div
+                  key={index}
+                  ref={el => messageRefs.current[message.timestamp] = el}
+                  className={`p-4 rounded-lg mb-2 ${
+                    message.type === 'user'
+                      ? 'bg-blue-50 ml-12 border border-blue-100'
+                      : 'bg-white mr-12 border border-gray-200'
+                  } ${message.isCrisis ? 'border-red-300 bg-red-50' : ''}`}
+                >
+                  {message.isCrisis && (
+                    <div className="flex items-center gap-2 text-red-500 mb-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span className="text-sm font-medium">Crisis Response</span>
                     </div>
-                  ))}
+                  )}
+                  {message.mood && message.type === 'user' && (
+                    <div className="text-xs text-gray-500 mb-1">
+                      {getMoodEmoji(message.mood)} Detected mood: {message.mood}
+                    </div>
+                  )}
+                  <p className="text-gray-800 whitespace-pre-line leading-relaxed">
+                    {message.type === 'assistant' 
+                      ? message.content.split('-').map((point, i) => 
+                          point.trim() ? (
+                            <span key={i} className="block">
+                              {i > 0 ? '• ' : ''}{point.trim()}
+                              {i < message.content.split('-').length - 1 && point.trim() ? '\n\n' : ''}
+                            </span>
+                          ) : null
+                        )
+                      : message.content
+                    }
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {new Date(message.timestamp).toLocaleTimeString()}
+                  </p>
                 </div>
               ))}
               {isLoading && (
@@ -304,20 +300,36 @@ const ChatInterface = () => {
           <div className="flex items-center gap-2 text-gray-800">
             <Calendar className="h-5 w-5 text-blue-600" />
             <span className="font-semibold">Recents</span>
-            <button
-              onClick={clearHistory}
-              className="ml-auto text-sm text-red-500 hover:text-red-600"
-            >
-              Clear History
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={startNewChat}
+                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                New Chat
+              </button>
+              <button
+                onClick={clearHistory}
+                className="text-sm text-red-500 hover:text-red-600"
+              >
+                Clear All
+              </button>
+            </div>
           </div>
         </div>
         <div className="p-4 overflow-y-auto max-h-[calc(100vh-8rem)]">
           {groupConversations(messages).map((conversation, index) => (
             <div
               key={index}
-              onClick={() => scrollToMessage(conversation.messages[0].timestamp)}
-              className="mb-4 cursor-pointer"
+              onClick={() => {
+                setActiveConversationId(conversation.id);
+                scrollToMessage(conversation.messages[0].timestamp);
+              }}
+              className={`mb-4 cursor-pointer ${
+                conversation.id === activeConversationId
+                  ? 'bg-blue-50'
+                  : ''
+              }`}
             >
               <div className="flex items-start gap-3 hover:bg-gray-50 p-2 rounded-lg">
                 <div className="mt-1">
@@ -344,14 +356,6 @@ const ChatInterface = () => {
               </p>
             </div>
           )}
-        </div>
-        <div className="p-4 border-t border-gray-200">
-          <button
-            onClick={() => scrollToBottom()}
-            className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-2"
-          >
-            View all →
-          </button>
         </div>
       </div>
     </div>

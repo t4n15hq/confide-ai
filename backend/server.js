@@ -44,7 +44,36 @@ const isCrisis = (text) => {
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const { messages } = req.body;
+    const { message, messages, conversationId } = req.body;
+    console.log('Received request:', { conversationId, messageType: message ? 'summary' : 'chat' });
+
+    // Handle journal summary request
+    if (conversationId === 'journal-summary' && message) {
+      console.log('Processing journal summary request');
+      
+      const response = await anthropic.messages.create({
+        model: "claude-3-haiku-20240307",
+        max_tokens: 1024,
+        temperature: 0.7,
+        messages: [
+          {
+            role: "user",
+            content: message
+          }
+        ]
+      });
+
+      console.log('Summary generated successfully');
+      return res.json({ 
+        message: response.content[0].text
+      });
+    }
+
+    // Handle regular chat request
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      throw new Error('Invalid messages format for chat request');
+    }
+
     const latestMessage = messages[messages.length - 1].content;
     const currentMood = detectMood(latestMessage);
     const crisisDetected = isCrisis(latestMessage);
@@ -96,7 +125,8 @@ app.post('/api/chat', async (req, res) => {
     console.error('API Error:', error);
     res.status(500).json({ 
       error: 'Internal server error',
-      details: error.message 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
