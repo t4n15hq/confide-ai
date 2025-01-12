@@ -18,12 +18,18 @@ Confide AI is an intelligent therapeutic journaling and chat application that pr
 - **Entry Management**: Easy saving, editing, and deletion of entries
 - **Calendar View**: Visual representation of journaling consistency
 
+<img width="1613" alt="Screenshot 2025-01-12 at 5 42 34 PM" src="https://github.com/user-attachments/assets/410414d8-1dcf-4281-a755-a0d01017036c" />
+
 ### 💭 Chat Interface
 - **Therapeutic AI**: Empathetic conversations powered by Claude AI
 - **Mood Detection**: Automatic analysis of emotional states
 - **Crisis Support**: Proactive detection and resource provision
 - **Conversation Management**: Organized chat history with mood context
 - **Multi-Session**: Support for multiple chat conversations
+
+<img width="1464" alt="Screenshot 2025-01-12 at 5 44 17 PM" src="https://github.com/user-attachments/assets/aef3a86a-2a5b-4576-a48a-1f419e8b470c" />
+<img width="1444" alt="Screenshot 2025-01-12 at 5 44 35 PM" src="https://github.com/user-attachments/assets/9b4f5dde-03a1-4172-989d-228848a2bd6a" />
+
 
 ### 🛡️ Safety Features
 - Automatic crisis keyword detection
@@ -36,6 +42,8 @@ Confide AI is an intelligent therapeutic journaling and chat application that pr
 - Entry frequency tracking
 - Progress monitoring
 - Pattern recognition
+
+<img width="1176" alt="Screenshot 2025-01-12 at 5 45 03 PM" src="https://github.com/user-attachments/assets/80968b0a-1e3e-4824-ae3b-24fa33281622" />
 
 ## Technical Stack
 
